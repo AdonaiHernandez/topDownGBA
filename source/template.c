@@ -1,5 +1,7 @@
 #include <string.h>
 #include "Pibe.h"
+#include "grass.h"
+#include "mapa.h"
 
 typedef unsigned char      uint8;
 typedef unsigned short     uint16;
@@ -167,6 +169,8 @@ int main(void) {
 //---------------------------------------------------------------------------------
     memcpy(MEM_PALETTE, PibePal, PibePalLen);
     memcpy(&MEM_TILE[4][1], PibeTiles, PibeTilesLen);
+
+
 
     REG_DISPLAYCONTROL =  VIDEOMODE_0 | BACKGROUND_0 | ENABLE_OBJECTS | MAPPINGMODE_1D;
 
