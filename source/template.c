@@ -1,7 +1,7 @@
 #include <string.h>
 #include "Pibe.h"
 #include "grass.h"
-#include "mapa.h"
+#include "mapita.h"
 
 typedef unsigned char      uint8;
 typedef unsigned short     uint16;
@@ -69,6 +69,9 @@ inline void vsync()
 
 uint32  key_states = 0;
 
+volatile short* bg0_x_scroll = (volatile short*) 0x4000010;
+volatile short* bg0_y_scroll = (volatile short*) 0x4000012;
+
 struct PibeSprite{
     uint8 animationFrame;
     uint16 firstUpAnim;
@@ -80,10 +83,13 @@ struct PibeSprite{
 
 struct PibeSprite pibito;
 
+uint8 haveToXScroll = 0;
+uint8 haveToYScroll = 0;
 
 int direction = 0;
 uint8 moving = 0;
-uint8 moveSpeed = 6;
+uint8 moveSpeed = 4;
+uint8 cant_move = 0;
 
 void tickAnimationFrame(volatile ObjectAttributes *attrs){
     uint16 fAnim = 0;
@@ -115,6 +121,9 @@ void tickAnimationFrame(volatile ObjectAttributes *attrs){
 }
 
 void getKeys(){
+    if (cant_move == 1){
+        return;
+    }
     key_states = ~REG_KEY_INPUT & KEY_ANY;
 
     if ( key_states & KEY_DOWN ){
@@ -137,7 +146,8 @@ void getKeys(){
         moving = 0;
     }
 }
-
+uint16 xScroll = 0;
+uint16 yScroll = 0;
 void changePosition(volatile ObjectAttributes *attrs){
 
     if (moving == 0)
@@ -145,6 +155,9 @@ void changePosition(volatile ObjectAttributes *attrs){
 
     if (direction == 0){
         attrs->attr0 += moveSpeed;
+        if ((attrs->attr0 & 0xFF) >= (SCREEN_H - 32)){
+            haveToYScroll = 1;
+        }
     }
     else if (direction == 1){
         if ((attrs->attr0 & 0xFF) > 0)
@@ -156,23 +169,80 @@ void changePosition(volatile ObjectAttributes *attrs){
     }
     else if (direction == 3){
         attrs->attr1 += moveSpeed;
+        if ((attrs->attr1 & 0xFF) >= (SCREEN_W - 32)){
+            haveToXScroll = 1;
+        }
     }
 
+}
+
+volatile uint16* char_block(uint32 block){ //Tiles
+    return (volatile uint16*) (0x6000000 + (block * 0x4000));
+}
+
+volatile uint16* screen_block(uint32 block){ //Background
+    return (volatile uint16*) (0x6000000 + (block * 0x800));
+}
+
+volatile unsigned short* bg0_control = (volatile unsigned short*) 0x4000008;
+volatile unsigned short* bg_palette = (volatile unsigned short*) 0x5000000;
+
+int recolocateScrollPlayer(volatile ObjectAttributes *attrs, uint8 dir){
+    if (dir == 0){
+        if ((attrs->attr0 & 0xFF)-10 > 0)
+            attrs->attr0 -=10;
+        else
+            attrs->attr0 = 0;
+    }
+    else if (dir == 1){
+        attrs->attr0 +=10;
+    }
+    else if (dir == 2){
+        if ((attrs->attr1 & 0xFF)-10 > 0)
+            attrs->attr1 -=10;
+        else
+            attrs->attr1 = 0;
+    }
+    else if (dir == 3){
+        attrs->attr1 +=10;
+    }
+    return 0;
 }
 
 //---------------------------------------------------------------------------------
 // Program entry point
 //---------------------------------------------------------------------------------
 int main(void) {
-    REG_TM2D= 0;
-    REG_TM2CNT= 0b0000000010000011;
+    //REG_TM2D= 0;
+    //REG_TM2CNT= 0b0000000010000011;
 //---------------------------------------------------------------------------------
     memcpy(MEM_PALETTE, PibePal, PibePalLen);
     memcpy(&MEM_TILE[4][1], PibeTiles, PibeTilesLen);
 
 
+    for (int i = 0; i < grassPalLen; i++) {
+        bg_palette[i] = grassPal[i];
+    }
+
+    volatile unsigned short* dest = char_block(0);
+    for (int i = 0; i < grassTilesLen; i++) {
+        dest[i] = grassTiles[i];
+    }
+
+    dest = screen_block(16);
+    for (int i = 0; i < (mapita_width * mapita_height); i++) {
+        dest[i] = mapita[i];
+    }
 
     REG_DISPLAYCONTROL =  VIDEOMODE_0 | BACKGROUND_0 | ENABLE_OBJECTS | MAPPINGMODE_1D;
+
+    *bg0_control = 0    |   /* priority, 0 is highest, 3 is lowest */
+                   (0 << 2)  |   /* the char block the image data is stored in */
+                   (0 << 6)  |   /* the mosaic flag */
+                   (0 << 7)  |   /* color mode, 0 is 16 colors, 1 is 256 colors */
+                   (16 << 8) |   /* the screen block the tile data is stored in */
+                   (1 << 13) |   /* wrapping flag */
+                   (0 << 14);    /* bg size, 0 is 256x256 */
 
     volatile ObjectAttributes *spriteAttribsb = &MEM_OAM[0];
     spriteAttribsb->attr0 = 0x0000;
@@ -193,12 +263,39 @@ int main(void) {
             time = 0;
             tickAnimationFrame(spriteAttribsb);
             changePosition(spriteAttribsb);
+            //xScroll++;
+            //yScroll++;
+            if (haveToXScroll == 1){
+                if (xScroll < SCREEN_W - 32){
+                    recolocateScrollPlayer(spriteAttribsb, 2);
+                    xScroll+=10;
+                    cant_move = 1;
+                    moving = 0;
+                } else{
+                    cant_move = 0;
+                }
+
+            }
+            if (haveToYScroll == 1){
+                if (yScroll < SCREEN_H - 32){
+                    recolocateScrollPlayer(spriteAttribsb, 0);
+                    yScroll+=10;
+                    cant_move = 1;
+                    moving = 0;
+                } else{
+                    cant_move = 0;
+                }
+
+            }
         }else
             time++;
 
         getKeys();
 
         vsync();
+
+        *bg0_x_scroll = xScroll;
+        *bg0_y_scroll = yScroll;
 	}
 
     return 0;

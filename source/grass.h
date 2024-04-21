@@ -17,11 +17,11 @@
 #ifndef GRIT_GRASS_H
 #define GRIT_GRASS_H
 
-#define grassTilesLen 512
-extern const unsigned int grassTiles[128];
+#define grassTilesLen 256
+extern const unsigned short grassTiles[128];
 
-#define grassPalLen 512
-extern const unsigned int grassPal[128];
+#define grassPalLen 256
+extern const unsigned short grassPal[128];
 
 #endif // GRIT_GRASS_H
 
