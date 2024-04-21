@@ -4,11 +4,11 @@
 //======================================================================
 //
 //	Pibe, 128x128@4, 
-//	+ palette 16 entries, not compressed
+//	+ palette 256 entries, not compressed
 //	+ 256 tiles Metatiled by 4x4 not compressed
-//	Total size: 32 + 8192 = 8224
+//	Total size: 512 + 8192 = 8704
 //
-//	Time-stamp: 2024-04-18, 21:46:14
+//	Time-stamp: 2024-04-21, 19:32:03
 //	Exported by Cearn's GBA Image Transmogrifier, v0.8.3
 //	( http://www.coranac.com/projects/#grit )
 //

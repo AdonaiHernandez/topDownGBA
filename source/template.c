@@ -88,7 +88,7 @@ uint8 haveToYScroll = 0;
 
 int direction = 0;
 uint8 moving = 0;
-uint8 moveSpeed = 4;
+uint8 moveSpeed = 2;
 uint8 cant_move = 0;
 
 void tickAnimationFrame(volatile ObjectAttributes *attrs){
@@ -200,8 +200,6 @@ int recolocateScrollPlayer(volatile ObjectAttributes *attrs, uint8 dir){
     else if (dir == 2){
         if ((attrs->attr1 & 0xFF)-10 > 0)
             attrs->attr1 -=10;
-        else
-            attrs->attr1 = 0;
     }
     else if (dir == 3){
         attrs->attr1 +=10;
