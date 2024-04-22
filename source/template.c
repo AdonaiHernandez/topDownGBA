@@ -207,6 +207,33 @@ int recolocateScrollPlayer(volatile ObjectAttributes *attrs, uint8 dir){
     return 0;
 }
 
+int backgroundScrolling(volatile ObjectAttributes *attrs){
+    if (haveToXScroll == 1){
+        if (xScroll < SCREEN_W - 32){
+            recolocateScrollPlayer(attrs, 2);
+            xScroll+=10;
+            cant_move = 1;
+            moving = 0;
+        } else{
+            cant_move = 0;
+        }
+
+    }
+    if (haveToYScroll == 1){
+        if (yScroll < SCREEN_H - 32){
+            recolocateScrollPlayer(attrs, 0);
+            yScroll+=10;
+            cant_move = 1;
+            moving = 0;
+        } else{
+            cant_move = 0;
+        }
+
+    }
+
+    return 0;
+}
+
 //---------------------------------------------------------------------------------
 // Program entry point
 //---------------------------------------------------------------------------------
@@ -257,34 +284,12 @@ int main(void) {
     pibito.numAnims = 4;
 
 	while (1) {
-        if (time >= 6){ //Buen calculo para la animacion de caminar cada 10 ciclos, aunque es dependiente del codigo que se ejecute por ciclo
+        if (time >= 6){ 
             time = 0;
             tickAnimationFrame(spriteAttribsb);
             changePosition(spriteAttribsb);
-            //xScroll++;
-            //yScroll++;
-            if (haveToXScroll == 1){
-                if (xScroll < SCREEN_W - 32){
-                    recolocateScrollPlayer(spriteAttribsb, 2);
-                    xScroll+=10;
-                    cant_move = 1;
-                    moving = 0;
-                } else{
-                    cant_move = 0;
-                }
+            backgroundScrolling(spriteAttribsb);
 
-            }
-            if (haveToYScroll == 1){
-                if (yScroll < SCREEN_H - 32){
-                    recolocateScrollPlayer(spriteAttribsb, 0);
-                    yScroll+=10;
-                    cant_move = 1;
-                    moving = 0;
-                } else{
-                    cant_move = 0;
-                }
-
-            }
         }else
             time++;
 
