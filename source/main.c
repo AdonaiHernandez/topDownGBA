@@ -82,6 +82,7 @@ uint32  key_states = 0;
 struct Background{
     uint16 posX;
     uint16 posY;
+    uint8 haveToScroll;
     volatile short* scrollX;
     volatile short* scrollY;
 };
@@ -222,13 +223,13 @@ void setPlayerX(uint16 newX){
 
 void movePlayerX(int x){
     int actX = (player.attributes->attr1 & 0x1FF);
-    if (actX + x > 0 && actX + x <= BACKGROUND_W)
+    if (actX + x > 0 && actX + x <= (BACKGROUND_W-(40)))
         player.attributes->attr1 += x;
 }
 
 void movePlayerY(int y){
     int actY = (player.attributes->attr0 & 0xFF);
-    if (actY + y > 0 && actY + y <= BACKGROUND_H)
+    if (actY + y > 0 && actY + y <= SCREEN_H)
         player.attributes->attr0 += y;
 }
 
@@ -355,6 +356,67 @@ void keyActions(){
     }
 }
 
+void checkBGPosition(){
+
+    if (background0.haveToScroll > 0)
+        return;
+
+    uint16 playerAbsX = background0.posX + getPlayerX();
+    uint16 BGScrenPosX = SCREEN_W - 32; //ancho del personaje
+
+    uint16 playerAbsY = background0.posY + getPlayerY();
+    uint16 BGScrenPosY = SCREEN_H; //ancho del personaje
+
+
+    if (playerAbsX >= BGScrenPosX){
+        background0.haveToScroll = 3;
+    }
+    else if(getPlayerX() <= 32 && background0.posX > 0){
+        background0.haveToScroll = 4;
+    }
+    else if(playerAbsY >= BGScrenPosY){
+        background0.haveToScroll = 2;
+    }
+    else if(getPlayerY() <= 32 && background0.posY > 0){
+        background0.haveToScroll = 1;
+    }
+}
+
+void smoothScroll(){
+    if (background0.haveToScroll == 3){
+        if (background0.posX + SCREEN_W < BACKGROUND_W)
+            background0.posX += 1;
+        else
+            background0.haveToScroll = 0;
+    }
+
+    if (background0.haveToScroll == 4){
+        if (background0.posX > 0)
+            background0.posX -= 1;
+        else
+            background0.haveToScroll = 0;
+    }
+
+    if (background0.haveToScroll == 2){
+        if (background0.posY + SCREEN_H < BACKGROUND_H)
+            background0.posY += 1;
+        else
+            background0.haveToScroll = 0;
+    }
+
+    if (background0.haveToScroll == 1){
+        if (background0.posY > 0)
+            background0.posY -= 1;
+        else
+            background0.haveToScroll = 0;
+    }
+}
+
+void updateBG(){
+    *background0.scrollX = background0.posX;
+    *background0.scrollY = background0.posY;
+}
+
 //---------------------------------------------------------------------------------
 // Program entry point
 //---------------------------------------------------------------------------------
@@ -368,12 +430,16 @@ int main(void) {
         if (time >= 6){ 
             time = 0;
             tickAnimationFrame();
+            checkBGPosition();
         }else
             time++;
 
         keyActions();
+        smoothScroll();
 
         vsync();
+
+        updateBG();
 	}
 
     return 0;
