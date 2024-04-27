@@ -76,8 +76,60 @@ inline void vsync()
 
 uint32  key_states = 0;
 
-volatile short* bg0_x_scroll = (volatile short*) 0x4000010;
-volatile short* bg0_y_scroll = (volatile short*) 0x4000012;
+#define BACKGROUND_W 255
+#define BACKGROUND_H 255
+
+struct Background{
+    uint16 posX;
+    uint16 posY;
+    volatile short* scrollX;
+    volatile short* scrollY;
+};
+
+struct Background background0;
+
+volatile uint16* char_block(uint32 block){ //Tiles
+    return (volatile uint16*) (0x6000000 + (block * 0x4000));
+}
+
+volatile uint16* screen_block(uint32 block){ //Background
+    return (volatile uint16*) (0x6000000 + (block * 0x800));
+}
+
+volatile unsigned short* bg0_control = (volatile unsigned short*) 0x4000008;
+volatile unsigned short* bg_palette = (volatile unsigned short*) 0x5000000;
+
+
+void createBackground(){
+    for (int i = 0; i < grassPalLen; i++) {
+        bg_palette[i] = grassPal[i];
+    }
+
+    volatile unsigned short* dest = char_block(0);
+    for (int i = 0; i < grassTilesLen; i++) {
+        dest[i] = grassTiles[i];
+    }
+
+    dest = screen_block(16);
+    for (int i = 0; i < (mapita_width * mapita_height); i++) {
+        dest[i] = mapita[i];
+    }
+
+    REG_DISPLAYCONTROL =  VIDEOMODE_0 | BACKGROUND_0 | ENABLE_OBJECTS | MAPPINGMODE_1D;
+
+    *bg0_control = 0    |   /* priority, 0 is highest, 3 is lowest */
+                   (0 << 2)  |   /* the char block the image data is stored in */
+                   (0 << 6)  |   /* the mosaic flag */
+                   (0 << 7)  |   /* color mode, 0 is 16 colors, 1 is 256 colors */
+                   (16 << 8) |   /* the screen block the tile data is stored in */
+                   (1 << 13) |   /* wrapping flag */
+                   (0 << 14);    /* bg size, 0 is 256x256 */
+
+    background0.posX = 0;
+    background0.posY = 0;
+    background0.scrollX = (volatile short*) 0x4000010;
+    background0.scrollY = (volatile short*) 0x4000012;
+}
 
 enum Keys {
     A,
@@ -126,7 +178,6 @@ struct PlayerInfo player;
 struct PlayerSprite pibito;
 
 void createPlayer(){
-
     memcpy(MEM_PALETTE, PibePal, PibePalLen);
     memcpy(&MEM_TILE[4][1], PibeTiles, PibeTilesLen);
 
@@ -144,7 +195,7 @@ void createPlayer(){
 
     player.attributes = attrs;
     player.sprites = &pibito;
-    player.direction = 0;
+    player.direction = 1;
     player.canMove = 1;
     player.isMoving = 0;
     player.moveSpeed = 1;
@@ -171,23 +222,18 @@ void setPlayerX(uint16 newX){
 
 void movePlayerX(int x){
     int actX = (player.attributes->attr1 & 0x1FF);
-    if (actX + x > 0)
+    if (actX + x > 0 && actX + x <= BACKGROUND_W)
         player.attributes->attr1 += x;
 }
 
 void movePlayerY(int y){
     int actY = (player.attributes->attr0 & 0xFF);
-    if (actY + y > 0)
+    if (actY + y > 0 && actY + y <= BACKGROUND_H)
         player.attributes->attr0 += y;
 }
 
 uint8 haveToXScroll = 0;
 uint8 haveToYScroll = 0;
-
-int direction = 0;
-uint8 moving = 0;
-uint8 moveSpeed = 2;
-uint8 cant_move = 0;
 
 void tickAnimationFrame(){
     uint16 fAnim = 0;
@@ -215,52 +261,10 @@ void tickAnimationFrame(){
     }else {
         player.sprites->animationFrame++;
     }
-
 }
 
 int xScroll = 0;
 int yScroll = 0;
-void changePosition(volatile ObjectAttributes *attrs){
-
-    if (moving == 0)
-        return;
-
-    if (direction == 0){
-        attrs->attr0 += moveSpeed;
-        if ((attrs->attr0 & 0xFF) >= (SCREEN_H - 32)){
-            haveToYScroll = 1;
-        }
-    }
-    else if (direction == 1){
-        if ((attrs->attr0 & 0xFF) > 0)
-            attrs->attr0 -= moveSpeed;
-        if ((attrs->attr0 & 0xFF) == 0){
-            haveToYScroll = 2;
-        }
-    }
-    else if (direction == 2){
-        if ((attrs->attr1 & 0xFF) > 0)
-            attrs->attr1 -= moveSpeed;
-    }
-    else if (direction == 3){
-        attrs->attr1 += moveSpeed;
-        if ((attrs->attr1 & 0xFF) >= (SCREEN_W - 32)){
-            haveToXScroll = 1;
-        }
-    }
-
-}
-
-volatile uint16* char_block(uint32 block){ //Tiles
-    return (volatile uint16*) (0x6000000 + (block * 0x4000));
-}
-
-volatile uint16* screen_block(uint32 block){ //Background
-    return (volatile uint16*) (0x6000000 + (block * 0x800));
-}
-
-volatile unsigned short* bg0_control = (volatile unsigned short*) 0x4000008;
-volatile unsigned short* bg_palette = (volatile unsigned short*) 0x5000000;
 
 int recolocateScrollPlayer(volatile ObjectAttributes *attrs, uint8 dir){
     if (dir == 0){
@@ -282,7 +286,7 @@ int recolocateScrollPlayer(volatile ObjectAttributes *attrs, uint8 dir){
     return 0;
 }
 
-int backgroundScrolling(volatile ObjectAttributes *attrs){
+/*int backgroundScrolling(volatile ObjectAttributes *attrs){
     if (haveToXScroll == 1){
         if (xScroll < SCREEN_W - 32){
             recolocateScrollPlayer(attrs, 2);
@@ -319,7 +323,7 @@ int backgroundScrolling(volatile ObjectAttributes *attrs){
     }
 
     return 0;
-}
+}*/
 
 void keyActions(){
     if (getKeyDown(RT)){
@@ -355,54 +359,21 @@ void keyActions(){
 // Program entry point
 //---------------------------------------------------------------------------------
 int main(void) {
-    //REG_TM2D= 0;
-    //REG_TM2CNT= 0b0000000010000011;
-//---------------------------------------------------------------------------------
-
-    for (int i = 0; i < grassPalLen; i++) {
-        bg_palette[i] = grassPal[i];
-    }
-
-    volatile unsigned short* dest = char_block(0);
-    for (int i = 0; i < grassTilesLen; i++) {
-        dest[i] = grassTiles[i];
-    }
-
-    dest = screen_block(16);
-    for (int i = 0; i < (mapita_width * mapita_height); i++) {
-        dest[i] = mapita[i];
-    }
-
-    REG_DISPLAYCONTROL =  VIDEOMODE_0 | BACKGROUND_0 | ENABLE_OBJECTS | MAPPINGMODE_1D;
-
-    *bg0_control = 0    |   /* priority, 0 is highest, 3 is lowest */
-                   (0 << 2)  |   /* the char block the image data is stored in */
-                   (0 << 6)  |   /* the mosaic flag */
-                   (0 << 7)  |   /* color mode, 0 is 16 colors, 1 is 256 colors */
-                   (16 << 8) |   /* the screen block the tile data is stored in */
-                   (1 << 13) |   /* wrapping flag */
-                   (0 << 14);    /* bg size, 0 is 256x256 */
 
     uint32 time = 0;
-
+    createBackground();
     createPlayer();
 
 	while (1) {
         if (time >= 6){ 
             time = 0;
             tickAnimationFrame();
-            //changePosition(spriteAttribsb);
-            //backgroundScrolling(spriteAttribsb);
-
         }else
             time++;
 
         keyActions();
 
         vsync();
-
-        *bg0_x_scroll = xScroll;
-        *bg0_y_scroll = yScroll;
 	}
 
     return 0;
