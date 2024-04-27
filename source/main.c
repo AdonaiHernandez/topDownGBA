@@ -90,10 +90,14 @@ enum Keys {
     DWN,
     R,
     L,
-    NONE
+    ANY
 };
 
 uint16 getKeyDown(enum Keys key){
+
+    if (key == ANY){
+        return key_states;
+    }
 
     key_states = ~REG_KEY_INPUT & KEY_ANY;
 
@@ -185,61 +189,35 @@ uint8 moving = 0;
 uint8 moveSpeed = 2;
 uint8 cant_move = 0;
 
-/*void tickAnimationFrame(volatile ObjectAttributes *attrs){
+void tickAnimationFrame(){
     uint16 fAnim = 0;
 
-    if (direction == 0){
-        fAnim = pibito.firstBotAnim;
+    if (player.direction == 1){
+        fAnim = player.sprites->firstBotAnim;
     }
-    else if (direction == 1){
-        fAnim = pibito.firstUpAnim;
+    else if (player.direction == 0){
+        fAnim = player.sprites->firstUpAnim;
     }
-    else if (direction == 2){
-        fAnim = pibito.firstLeftAnim;
+    else if (player.direction == 3){
+        fAnim = player.sprites->firstLeftAnim;
     }
-    else if (direction == 3){
-        fAnim = pibito.firstRightAnim;
+    else if (player.direction == 2){
+        fAnim = player.sprites->firstRightAnim;
     }
 
-    if (moving == 1)
-        attrs->attr2 = (fAnim + pibito.animationFrame * 16);
+    if (player.isMoving == 1)
+        player.attributes->attr2 = (fAnim + player.sprites->animationFrame * 16);
     else
-        attrs->attr2 = fAnim;
+        player.attributes->attr2 = fAnim;
 
-    if (pibito.animationFrame == 3){
-        pibito.animationFrame = 0;
+    if (player.sprites->animationFrame == 3){
+        player.sprites->animationFrame = 0;
     }else {
-        pibito.animationFrame++;
+        player.sprites->animationFrame++;
     }
 
-}*/
-
-void getKeys(){
-    if (cant_move == 1){
-        return;
-    }
-    key_states = ~REG_KEY_INPUT & KEY_ANY;
-
-    if ( key_states & KEY_DOWN ){
-        direction = 0;
-        moving = 1;
-    }
-    else if ( key_states & KEY_UP ){
-        direction = 1;
-        moving = 1;
-    }
-    else if ( key_states & KEY_LEFT ){
-        direction = 2;
-        moving = 1;
-    }
-    else if ( key_states & KEY_RGHT ){
-        direction = 3;
-        moving = 1;
-    }
-    else {
-        moving = 0;
-    }
 }
+
 int xScroll = 0;
 int yScroll = 0;
 void changePosition(volatile ObjectAttributes *attrs){
@@ -368,7 +346,7 @@ void keyActions(){
         player.direction = 1;
     }
 
-    if (getKeyDown(NONE)){
+    if (!getKeyDown(ANY)){
         player.isMoving = 0;
     }
 }
@@ -380,8 +358,6 @@ int main(void) {
     //REG_TM2D= 0;
     //REG_TM2CNT= 0b0000000010000011;
 //---------------------------------------------------------------------------------
-
-
 
     for (int i = 0; i < grassPalLen; i++) {
         bg_palette[i] = grassPal[i];
@@ -414,14 +390,12 @@ int main(void) {
 	while (1) {
         if (time >= 6){ 
             time = 0;
-            //tickAnimationFrame(spriteAttribsb);
+            tickAnimationFrame();
             //changePosition(spriteAttribsb);
             //backgroundScrolling(spriteAttribsb);
 
         }else
             time++;
-
-        //getKeys();
 
         keyActions();
 
