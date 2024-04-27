@@ -35,8 +35,15 @@ typedef Tile   TileBlock[256];
 
 #define REG_KEY_INPUT      (*((volatile uint32 *)(MEM_IO + 0x0130)))
 
-#define KEY_UP   0x0040
+#define KEY_A   0x0001
+#define KEY_B   0x0002
+#define KEY_SELECT   0x0004
+#define KEY_START   0x0008
+#define KEY_LTRG   0x0100
+#define KEY_RTRG   0x0200
+
 #define KEY_DOWN 0x0080
+#define KEY_UP   0x0040
 #define KEY_LEFT 0x0020
 #define KEY_RGHT 0x0010
 #define KEY_ANY  0x03FF
@@ -72,7 +79,28 @@ uint32  key_states = 0;
 volatile short* bg0_x_scroll = (volatile short*) 0x4000010;
 volatile short* bg0_y_scroll = (volatile short*) 0x4000012;
 
-struct PibeSprite{
+enum Keys {
+    A,
+    B,
+    SL,
+    ST,
+    RT,
+    LFT,
+    UP,
+    DWN,
+    R,
+    L,
+    NONE
+};
+
+uint16 getKeyDown(enum Keys key){
+
+    key_states = ~REG_KEY_INPUT & KEY_ANY;
+
+    return key_states & (1 << key);
+};
+
+struct PlayerSprite{
     uint8 animationFrame;
     uint16 firstUpAnim;
     uint16 firstBotAnim;
@@ -81,7 +109,61 @@ struct PibeSprite{
     uint16 numAnims;
 };
 
-struct PibeSprite pibito;
+struct PlayerInfo{
+    struct PlayerSprite* sprites;
+    volatile struct ObjectAttributes* attributes;
+    short isMoving;
+    short canMove;
+    short direction;
+};
+
+struct PlayerInfo player;
+struct PlayerSprite pibito;
+
+void createPlayer(){
+
+    memcpy(MEM_PALETTE, PibePal, PibePalLen);
+    memcpy(&MEM_TILE[4][1], PibeTiles, PibeTilesLen);
+
+    volatile ObjectAttributes *attrs = &MEM_OAM[0];
+    attrs->attr0 = 0x0000;
+    attrs->attr1 = 0x8000;
+    attrs->attr2 = 2;
+
+    pibito.animationFrame = 0;
+    pibito.firstBotAnim = 2;
+    pibito.firstUpAnim = 64+2;
+    pibito.firstLeftAnim = 128+2;
+    pibito.firstRightAnim = 192+2;
+    pibito.numAnims = 4;
+
+    player.attributes = attrs;
+    player.sprites = &pibito;
+    player.direction = 0;
+    player.canMove = 1;
+    player.isMoving = 0;
+
+}
+
+uint16 getPlayerX(){
+    return player.attributes->attr1 & (uint16)0x1FF;
+}
+
+uint16 getPlayerY(){
+    return player.attributes->attr0 & 0xFF;
+}
+
+void setPlayerY(uint8 newY){
+    if (newY > 0 && newY < SCREEN_H)
+        player.attributes->attr0 = (player.attributes->attr0 & ~0xFF) | newY;
+}
+
+void setPlayerX(uint16 newX){
+    if (newX > 0 && newX < SCREEN_W)
+        player.attributes->attr1 = (player.attributes->attr1 & ~0x1FF) | newX;
+}
+
+
 
 uint8 haveToXScroll = 0;
 uint8 haveToYScroll = 0;
@@ -91,7 +173,7 @@ uint8 moving = 0;
 uint8 moveSpeed = 2;
 uint8 cant_move = 0;
 
-void tickAnimationFrame(volatile ObjectAttributes *attrs){
+/*void tickAnimationFrame(volatile ObjectAttributes *attrs){
     uint16 fAnim = 0;
 
     if (direction == 0){
@@ -118,7 +200,7 @@ void tickAnimationFrame(volatile ObjectAttributes *attrs){
         pibito.animationFrame++;
     }
 
-}
+}*/
 
 void getKeys(){
     if (cant_move == 1){
@@ -146,8 +228,8 @@ void getKeys(){
         moving = 0;
     }
 }
-uint16 xScroll = 0;
-uint16 yScroll = 0;
+int xScroll = 0;
+int yScroll = 0;
 void changePosition(volatile ObjectAttributes *attrs){
 
     if (moving == 0)
@@ -162,6 +244,9 @@ void changePosition(volatile ObjectAttributes *attrs){
     else if (direction == 1){
         if ((attrs->attr0 & 0xFF) > 0)
             attrs->attr0 -= moveSpeed;
+        if ((attrs->attr0 & 0xFF) == 0){
+            haveToYScroll = 2;
+        }
     }
     else if (direction == 2){
         if ((attrs->attr1 & 0xFF) > 0)
@@ -231,6 +316,18 @@ int backgroundScrolling(volatile ObjectAttributes *attrs){
 
     }
 
+    if (haveToYScroll == 2){
+        if (yScroll > -(SCREEN_H - 32)){
+            recolocateScrollPlayer(attrs, 1);
+            yScroll-=10;
+            cant_move = 1;
+            moving = 0;
+        } else{
+            cant_move = 0;
+        }
+
+    }
+
     return 0;
 }
 
@@ -241,8 +338,7 @@ int main(void) {
     //REG_TM2D= 0;
     //REG_TM2CNT= 0b0000000010000011;
 //---------------------------------------------------------------------------------
-    memcpy(MEM_PALETTE, PibePal, PibePalLen);
-    memcpy(&MEM_TILE[4][1], PibeTiles, PibeTilesLen);
+
 
 
     for (int i = 0; i < grassPalLen; i++) {
@@ -269,31 +365,26 @@ int main(void) {
                    (1 << 13) |   /* wrapping flag */
                    (0 << 14);    /* bg size, 0 is 256x256 */
 
-    volatile ObjectAttributes *spriteAttribsb = &MEM_OAM[0];
-    spriteAttribsb->attr0 = 0x0000;
-    spriteAttribsb->attr1 = 0x8000;
-    spriteAttribsb->attr2 = 2;
-
     uint32 time = 0;
 
-    pibito.animationFrame = 0;
-    pibito.firstBotAnim = 2;
-    pibito.firstUpAnim = 64+2;
-    pibito.firstLeftAnim = 128+2;
-    pibito.firstRightAnim = 192+2;
-    pibito.numAnims = 4;
+    createPlayer();
 
 	while (1) {
         if (time >= 6){ 
             time = 0;
-            tickAnimationFrame(spriteAttribsb);
-            changePosition(spriteAttribsb);
-            backgroundScrolling(spriteAttribsb);
+            //tickAnimationFrame(spriteAttribsb);
+            //changePosition(spriteAttribsb);
+            //backgroundScrolling(spriteAttribsb);
 
         }else
             time++;
 
-        getKeys();
+        //getKeys();
+
+        if (getKeyDown(DWN)){
+            setPlayerY(10);
+            setPlayerX(10);
+        }
 
         vsync();
 
