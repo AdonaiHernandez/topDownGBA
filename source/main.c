@@ -115,6 +115,7 @@ struct PlayerInfo{
     short isMoving;
     short canMove;
     short direction;
+    short moveSpeed;
 };
 
 struct PlayerInfo player;
@@ -142,6 +143,7 @@ void createPlayer(){
     player.direction = 0;
     player.canMove = 1;
     player.isMoving = 0;
+    player.moveSpeed = 1;
 
 }
 
@@ -163,7 +165,17 @@ void setPlayerX(uint16 newX){
         player.attributes->attr1 = (player.attributes->attr1 & ~0x1FF) | newX;
 }
 
+void movePlayerX(int x){
+    int actX = (player.attributes->attr1 & 0x1FF);
+    if (actX + x > 0)
+        player.attributes->attr1 += x;
+}
 
+void movePlayerY(int y){
+    int actY = (player.attributes->attr0 & 0xFF);
+    if (actY + y > 0)
+        player.attributes->attr0 += y;
+}
 
 uint8 haveToXScroll = 0;
 uint8 haveToYScroll = 0;
@@ -331,6 +343,36 @@ int backgroundScrolling(volatile ObjectAttributes *attrs){
     return 0;
 }
 
+void keyActions(){
+    if (getKeyDown(RT)){
+        movePlayerX(player.moveSpeed);
+        player.isMoving = 1;
+        player.direction = 2;
+    }
+
+    if (getKeyDown(LFT)){
+        movePlayerX(-player.moveSpeed);
+        player.isMoving = 1;
+        player.direction = 3;
+    }
+
+    if (getKeyDown(UP)){
+        movePlayerY(-player.moveSpeed);
+        player.isMoving = 1;
+        player.direction = 0;
+    }
+
+    if (getKeyDown(DWN)){
+        movePlayerY(player.moveSpeed);
+        player.isMoving = 1;
+        player.direction = 1;
+    }
+
+    if (getKeyDown(NONE)){
+        player.isMoving = 0;
+    }
+}
+
 //---------------------------------------------------------------------------------
 // Program entry point
 //---------------------------------------------------------------------------------
@@ -381,10 +423,7 @@ int main(void) {
 
         //getKeys();
 
-        if (getKeyDown(DWN)){
-            setPlayerY(10);
-            setPlayerX(10);
-        }
+        keyActions();
 
         vsync();
 
