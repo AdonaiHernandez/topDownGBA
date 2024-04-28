@@ -229,7 +229,7 @@ void movePlayerX(int x){
 
 void movePlayerY(int y){
     int actY = (player.attributes->attr0 & 0xFF);
-    if (actY + y > 0 && actY + y <= SCREEN_H)
+    if (actY + y > 0 && actY + y < SCREEN_H-32)
         player.attributes->attr0 += y;
 }
 
@@ -257,7 +257,7 @@ void tickAnimationFrame(){
     else
         player.attributes->attr2 = fAnim;
 
-    if (player.sprites->animationFrame == 3){
+    if (player.sprites->animationFrame == player.sprites->numAnims-1){
         player.sprites->animationFrame = 0;
     }else {
         player.sprites->animationFrame++;
@@ -365,19 +365,19 @@ void checkBGPosition(){
     uint16 BGScrenPosX = SCREEN_W - 32; //ancho del personaje
 
     uint16 playerAbsY = background0.posY + getPlayerY();
-    uint16 BGScrenPosY = SCREEN_H; //ancho del personaje
+    uint16 BGScrenPosY = SCREEN_H - 35; //alto del personaje
 
 
     if (playerAbsX >= BGScrenPosX){
         background0.haveToScroll = 3;
     }
-    else if(getPlayerX() <= 32 && background0.posX > 0){
+    if(getPlayerX() <= 32 && background0.posX > 0){
         background0.haveToScroll = 4;
     }
-    else if(playerAbsY >= BGScrenPosY){
+    if(playerAbsY >= BGScrenPosY){
         background0.haveToScroll = 2;
     }
-    else if(getPlayerY() <= 32 && background0.posY > 0){
+    if(getPlayerY() <= 32 && background0.posY > 0){
         background0.haveToScroll = 1;
     }
 }
@@ -427,7 +427,7 @@ int main(void) {
     createPlayer();
 
 	while (1) {
-        if (time >= 6){ 
+        if (time >= 5){
             time = 0;
             tickAnimationFrame();
             checkBGPosition();
