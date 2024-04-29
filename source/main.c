@@ -287,65 +287,26 @@ int recolocateScrollPlayer(volatile ObjectAttributes *attrs, uint8 dir){
     return 0;
 }
 
-/*int backgroundScrolling(volatile ObjectAttributes *attrs){
-    if (haveToXScroll == 1){
-        if (xScroll < SCREEN_W - 32){
-            recolocateScrollPlayer(attrs, 2);
-            xScroll+=10;
-            cant_move = 1;
-            moving = 0;
-        } else{
-            cant_move = 0;
-        }
-
-    }
-    if (haveToYScroll == 1){
-        if (yScroll < SCREEN_H - 32){
-            recolocateScrollPlayer(attrs, 0);
-            yScroll+=10;
-            cant_move = 1;
-            moving = 0;
-        } else{
-            cant_move = 0;
-        }
-
-    }
-
-    if (haveToYScroll == 2){
-        if (yScroll > -(SCREEN_H - 32)){
-            recolocateScrollPlayer(attrs, 1);
-            yScroll-=10;
-            cant_move = 1;
-            moving = 0;
-        } else{
-            cant_move = 0;
-        }
-
-    }
-
-    return 0;
-}*/
-
 void keyActions(){
-    if (getKeyDown(RT)){
+    if (getKeyDown(RT) && player.canMove){
         movePlayerX(player.moveSpeed);
         player.isMoving = 1;
         player.direction = 2;
     }
 
-    if (getKeyDown(LFT)){
+    if (getKeyDown(LFT) && player.canMove){
         movePlayerX(-player.moveSpeed);
         player.isMoving = 1;
         player.direction = 3;
     }
 
-    if (getKeyDown(UP)){
+    if (getKeyDown(UP) && player.canMove){
         movePlayerY(-player.moveSpeed);
         player.isMoving = 1;
         player.direction = 0;
     }
 
-    if (getKeyDown(DWN)){
+    if (getKeyDown(DWN) && player.canMove){
         movePlayerY(player.moveSpeed);
         player.isMoving = 1;
         player.direction = 1;
@@ -362,53 +323,77 @@ void checkBGPosition(){
         return;
 
     uint16 playerAbsX = background0.posX + getPlayerX();
-    uint16 BGScrenPosX = SCREEN_W - 32; //ancho del personaje
+    uint16 BGScrenPosX = SCREEN_W - 32;
 
     uint16 playerAbsY = background0.posY + getPlayerY();
-    uint16 BGScrenPosY = SCREEN_H - 35; //alto del personaje
+    uint16 BGScrenPosY = SCREEN_H - 35;
 
 
-    if (playerAbsX >= BGScrenPosX){
+    if (playerAbsX >= BGScrenPosX && player.direction == 2){
         background0.haveToScroll = 3;
     }
-    if(getPlayerX() <= 32 && background0.posX > 0){
+    if(getPlayerX() <= 32 && background0.posX > 0 && player.direction == 3){
         background0.haveToScroll = 4;
     }
-    if(playerAbsY >= BGScrenPosY){
+    if(playerAbsY >= BGScrenPosY && player.direction == 1){
         background0.haveToScroll = 2;
     }
-    if(getPlayerY() <= 32 && background0.posY > 0){
+    if(getPlayerY() <= 1 && background0.posY > 0 && player.direction == 0){
         background0.haveToScroll = 1;
     }
 }
 
 void smoothScroll(){
     if (background0.haveToScroll == 3){
-        if (background0.posX + SCREEN_W < BACKGROUND_W)
+        if (background0.posX + SCREEN_W < BACKGROUND_W){
             background0.posX += 1;
-        else
+            movePlayerX(-1);
+            player.canMove = 0;
+            player.isMoving = 0;
+        }
+        else{
             background0.haveToScroll = 0;
+            player.canMove = 1;
+        }
     }
 
     if (background0.haveToScroll == 4){
-        if (background0.posX > 0)
+        if (background0.posX > 0){
             background0.posX -= 1;
-        else
+            movePlayerX(1);
+            player.canMove = 0;
+            player.isMoving = 0;
+        }
+        else{
             background0.haveToScroll = 0;
+            player.canMove = 1;
+        }
     }
 
     if (background0.haveToScroll == 2){
-        if (background0.posY + SCREEN_H < BACKGROUND_H)
+        if (background0.posY + SCREEN_H < BACKGROUND_H){
             background0.posY += 1;
-        else
+            movePlayerY(-1);
+            player.canMove = 0;
+            player.isMoving = 0;
+        }
+        else{
             background0.haveToScroll = 0;
+            player.canMove = 1;
+        }
     }
 
     if (background0.haveToScroll == 1){
-        if (background0.posY > 0)
+        if (background0.posY > 0){
             background0.posY -= 1;
-        else
+            movePlayerY(1);
+            player.canMove = 0;
+            player.isMoving = 0;
+        }
+        else{
             background0.haveToScroll = 0;
+            player.canMove = 1;
+        }
     }
 }
 
